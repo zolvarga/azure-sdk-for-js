@@ -3,12 +3,7 @@ import * as assert from "assert";
 import * as dotenv from "dotenv";
 
 import { DataLakeServiceClient, ServiceListFileSystemsSegmentResponse } from "../src";
-import {
-  getDataLakeServiceClient,
-  getSASConnectionStringFromEnvironment,
-  getTokenDataLakeServiceClient,
-  recorderEnvSetup
-} from "./utils";
+import { getDataLakeServiceClient, getTokenDataLakeServiceClient, recorderEnvSetup } from "./utils";
 
 dotenv.config();
 
@@ -350,20 +345,5 @@ describe("DataLakeServiceClient", () => {
     assert.notDeepStrictEqual(response.signedService, undefined);
     assert.notDeepStrictEqual(response.signedObjectId, undefined);
     assert.notDeepStrictEqual(response.signedExpiresOn, undefined);
-  });
-
-  it("can be created from SASConnString", async () => {
-    const newClient = DataLakeServiceClient.fromConnectionString(
-      getSASConnectionStringFromEnvironment(),
-      {
-        retryOptions: {
-          maxTries: 1
-        }
-      }
-    );
-
-    const listIter = newClient.listFileSystems();
-    await listIter.next();
-    assert.ok(newClient.url.includes("dfs"));
   });
 });
