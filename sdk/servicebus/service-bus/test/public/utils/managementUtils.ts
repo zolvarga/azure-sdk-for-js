@@ -18,7 +18,7 @@ let client: ServiceBusAdministrationClient;
  * a new instance constructed based on the connection string configured in environment.
  */
 function getManagementClient(): ServiceBusAdministrationClient {
-  if (client == undefined) {
+  if (client === undefined) {
     const env = getEnvVars();
     client = new ServiceBusAdministrationClient(env[EnvVarNames.SERVICEBUS_CONNECTION_STRING]);
   }
@@ -60,7 +60,7 @@ async function retry(
   }
 
   if (!succeeded) {
-    if (lastKnownError != undefined) {
+    if (lastKnownError !== undefined) {
       lastKnownError.message = operationDescription + " : " + lastKnownError.message;
       throw lastKnownError;
     } else {
@@ -178,8 +178,6 @@ export async function recreateSubscription(
 
 /**
  * Utility that verifies the message count of an entity.
- *
- * @returns {Promise<void>}
  */
 export async function verifyMessageCount(
   expectedMessageCount: number,

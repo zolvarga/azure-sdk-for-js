@@ -71,7 +71,7 @@ describe("Session Lock Renewal", () => {
     testClientType + ": Batch Receiver: renewLock() resets lock duration each time",
     async function(): Promise<void> {
       await beforeEachTest(0);
-      await testBatchReceiverManualLockRenewalHappyCase(sender, receiver);
+      await testBatchReceiverManualLockRenewalHappyCase();
     }
   );
 
@@ -79,7 +79,7 @@ describe("Session Lock Renewal", () => {
     testClientType + ": Batch Receiver: complete() after lock expiry with throws error",
     async function(): Promise<void> {
       await beforeEachTest(0);
-      await testBatchReceiverManualLockRenewalErrorOnLockExpiry(testClientType, sender, receiver);
+      await testBatchReceiverManualLockRenewalErrorOnLockExpiry(testClientType);
     }
   );
 
@@ -87,7 +87,7 @@ describe("Session Lock Renewal", () => {
     testClientType + ": Streaming Receiver: renewLock() resets lock duration each time",
     async function(): Promise<void> {
       await beforeEachTest(0);
-      await testStreamingReceiverManualLockRenewalHappyCase(sender, receiver);
+      await testStreamingReceiverManualLockRenewalHappyCase();
     }
   );
 
@@ -102,7 +102,7 @@ describe("Session Lock Renewal", () => {
       };
 
       await beforeEachTest(options.maxAutoRenewLockDurationInMs);
-      await testAutoLockRenewalConfigBehavior(sender, receiver, options);
+      await testAutoLockRenewalConfigBehavior(options);
     }
   );
 
@@ -116,7 +116,7 @@ describe("Session Lock Renewal", () => {
       };
 
       await beforeEachTest(options.maxAutoRenewLockDurationInMs);
-      await testAutoLockRenewalConfigBehavior(sender, receiver, options);
+      await testAutoLockRenewalConfigBehavior(options);
     }
   );
 
@@ -131,10 +131,7 @@ describe("Session Lock Renewal", () => {
   /**
    * Test manual renewLock() using Batch Receiver, with autoLockRenewal disabled
    */
-  async function testBatchReceiverManualLockRenewalHappyCase(
-    sender: ServiceBusSender,
-    receiver: ServiceBusSessionReceiver
-  ): Promise<void> {
+  async function testBatchReceiverManualLockRenewalHappyCase(): Promise<void> {
     const testMessage = getTestMessage();
     testMessage.body = `testBatchReceiverManualLockRenewalHappyCase-${Date.now().toString()}`;
     await sender.sendMessages(testMessage);
@@ -179,9 +176,7 @@ describe("Session Lock Renewal", () => {
    * Test settling of message from Batch Receiver fails after session lock expires
    */
   async function testBatchReceiverManualLockRenewalErrorOnLockExpiry(
-    entityType: TestClientType,
-    sender: ServiceBusSender,
-    receiver: ServiceBusSessionReceiver
+    entityType: TestClientType
   ): Promise<void> {
     const testMessage = getTestMessage();
     testMessage.body = `testBatchReceiverManualLockRenewalErrorOnLockExpiry-${Date.now().toString()}`;
@@ -218,10 +213,7 @@ describe("Session Lock Renewal", () => {
   /**
    * Test manual renewLock() using Streaming Receiver with autoLockRenewal disabled
    */
-  async function testStreamingReceiverManualLockRenewalHappyCase(
-    sender: ServiceBusSender,
-    receiver: ServiceBusSessionReceiver
-  ): Promise<void> {
+  async function testStreamingReceiverManualLockRenewalHappyCase(): Promise<void> {
     let numOfMessagesReceived = 0;
     const testMessage = getTestMessage();
     testMessage.body = `testStreamingReceiverManualLockRenewalHappyCase-${Date.now().toString()}`;
@@ -295,8 +287,6 @@ describe("Session Lock Renewal", () => {
   }
 
   async function testAutoLockRenewalConfigBehavior(
-    sender: ServiceBusSender,
-    receiver: ServiceBusSessionReceiver,
     options: AutoLockRenewalTestOptions
   ): Promise<void> {
     let numOfMessagesReceived = 0;
