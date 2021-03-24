@@ -97,16 +97,16 @@ export class ManagedIdentityCredential implements TokenCredential {
     getTokenOptions?: GetTokenOptions
   ): Promise<AccessToken | null> {
     const resource = mapScopesToResource(scopes);
-    const { span, options } = createSpan(
+    const { span, updatedOptions } = createSpan(
       "ManagedIdentityCredential-authenticateManagedIdentity",
       getTokenOptions
     );
 
     try {
       // Determining the available MSI, and avoiding checking for other MSIs while the program is running.
-      const availableMSI = await this.cachedAvailableMSI(resource, clientId, options);
+      const availableMSI = await this.cachedAvailableMSI(resource, clientId, updatedOptions);
 
-      return availableMSI.getToken(this.identityClient, resource, clientId, options);
+      return availableMSI.getToken(this.identityClient, resource, clientId, updatedOptions);
     } catch (err) {
       const code =
         err.name === AuthenticationErrorName
@@ -135,17 +135,17 @@ export class ManagedIdentityCredential implements TokenCredential {
   public async getToken(
     scopes: string | string[],
     options?: GetTokenOptions
-  ): Promise<AccessToken | null> {
+  ): Promise<AccessToken> {
     let result: AccessToken | null = null;
 
-    const { span, options: newOptions } = createSpan("ManagedIdentityCredential-getToken", options);
+    const { span, updatedOptions } = createSpan("ManagedIdentityCredential-getToken", options);
 
     try {
       // isEndpointAvailable can be true, false, or null,
       // If it's null, it means we don't yet know whether
       // the endpoint is available and need to check for it.
       if (this.isEndpointUnavailable !== true) {
-        result = await this.authenticateManagedIdentity(scopes, this.clientId, newOptions);
+        result = await this.authenticateManagedIdentity(scopes, this.clientId, updatedOptions);
 
         if (result === null) {
           // If authenticateManagedIdentity returns null,
@@ -181,7 +181,7 @@ export class ManagedIdentityCredential implements TokenCredential {
     } catch (err) {
       // CredentialUnavailable errors are expected to reach here.
       // We intend them to bubble up, so that DefaultAzureCredential can catch them.
-      if (err instanceof CredentialUnavailable) {
+      if (err.name === "AuthenticationRequired") {
         throw err;
       }
 

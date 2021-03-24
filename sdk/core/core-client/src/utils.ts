@@ -7,7 +7,7 @@ import { CompositeMapper, FullOperationResponse, OperationResponseMap } from "./
  * Returns true if the given value is a basic/primitive type
  * (string, number, boolean, null, undefined).
  * @param value - Value to test
- * @hidden @internal
+ * @internal
  */
 export function isPrimitiveType(value: unknown): boolean {
   return (typeof value !== "object" && typeof value !== "function") || value === null;
@@ -18,7 +18,7 @@ const validateISODuration = /^(-|\+)?P(?:([-+]?[0-9,.]*)Y)?(?:([-+]?[0-9,.]*)M)?
 /**
  * Returns true if the given string is in ISO 8601 format.
  * @param value - The value to be validated for ISO 8601 duration format.
- * @hidden @internal
+ * @internal
  */
 export function isDuration(value: string): boolean {
   return validateISODuration.test(value);
@@ -31,10 +31,65 @@ const validUuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F
  *
  * @param uuid - The uuid that needs to be validated.
  *
- * @hidden @internal
+ * @internal
  */
 export function isValidUuid(uuid: string): boolean {
   return validUuidRegex.test(uuid);
+}
+
+/**
+ * Representation of parsed response headers and body coupled with information
+ * about how to map them:
+ * - whether the response body should be wrapped (typically if its type is primitive).
+ * - whether the response is nullable so it can be null if the combination of
+ *   the headers and the body is empty.
+ */
+interface ResponseObjectWithMetadata {
+  /** whether the mapper allows nullable body */
+  hasNullableType: boolean;
+  /** whether the response's body should be wrapped */
+  shouldWrapBody: boolean;
+  /** parsed headers of the response */
+  headers:
+    | {
+        [key: string]: unknown;
+      }
+    | undefined;
+  /** parsed body of the response */
+  body: any;
+}
+
+/**
+ * Maps the response as follows:
+ * - wraps the response body if needed (typically if its type is primitive).
+ * - returns null if the combination of the headers and the body is empty.
+ * - otherwise, returns the combination of the headers and the body.
+ *
+ * @param responseObject - a representation of the parsed response
+ * @returns the response that will be returned to the user which can be null and/or wrapped
+ *
+ * @internal
+ */
+function handleNullableResponseAndWrappableBody(
+  responseObject: ResponseObjectWithMetadata
+): unknown | null {
+  const combinedHeadersAndBody = {
+    ...responseObject.headers,
+    ...responseObject.body
+  };
+  if (
+    responseObject.hasNullableType &&
+    Object.getOwnPropertyNames(combinedHeadersAndBody).length === 0
+  ) {
+    return responseObject.shouldWrapBody ? { body: null } : null;
+  } else {
+    return responseObject.shouldWrapBody
+      ? {
+          ...responseObject.headers,
+          body: responseObject.body
+        }
+      : combinedHeadersAndBody;
+  }
 }
 
 /**
@@ -50,8 +105,19 @@ export function flattenResponse(
   responseSpec: OperationResponseMap | undefined
 ): unknown {
   const parsedHeaders = fullResponse.parsedHeaders;
-  const bodyMapper = responseSpec && responseSpec.bodyMapper;
 
+  /**
+   * If body is not asked for, we return the response headers only. If the response
+   * has a body anyway, that body must be ignored.
+   */
+  if (fullResponse.request.method === "HEAD") {
+    return parsedHeaders;
+  }
+
+  const bodyMapper = responseSpec && responseSpec.bodyMapper;
+  const isNullable = Boolean(bodyMapper?.nullable);
+
+  /** If the body is asked for, we look at the mapper to handle it */
   if (bodyMapper) {
     const typeName = bodyMapper.type.name;
     if (typeName === "Stream") {
@@ -82,30 +148,28 @@ export function flattenResponse(
           arrayResponse[key] = parsedHeaders[key];
         }
       }
-      return arrayResponse;
+      return isNullable &&
+        !fullResponse.parsedBody &&
+        !parsedHeaders &&
+        Object.getOwnPropertyNames(modelProperties).length === 0
+        ? null
+        : arrayResponse;
     }
 
     if (typeName === "Composite" || typeName === "Dictionary") {
-      return {
-        ...parsedHeaders,
-        ...fullResponse.parsedBody
-      };
+      return handleNullableResponseAndWrappableBody({
+        body: fullResponse.parsedBody,
+        headers: parsedHeaders,
+        hasNullableType: isNullable,
+        shouldWrapBody: false
+      });
     }
   }
 
-  if (
-    bodyMapper ||
-    fullResponse.request.method === "HEAD" ||
-    isPrimitiveType(fullResponse.parsedBody)
-  ) {
-    return {
-      ...parsedHeaders,
-      body: fullResponse.parsedBody
-    };
-  }
-
-  return {
-    ...parsedHeaders,
-    ...fullResponse.parsedBody
-  };
+  return handleNullableResponseAndWrappableBody({
+    body: fullResponse.parsedBody,
+    headers: parsedHeaders,
+    hasNullableType: isNullable,
+    shouldWrapBody: isPrimitiveType(fullResponse.parsedBody)
+  });
 }

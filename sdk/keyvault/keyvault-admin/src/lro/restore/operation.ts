@@ -9,7 +9,7 @@ import {
   KeyVaultClientRestoreStatusResponse,
   RestoreOperation
 } from "../../generated/models";
-import { createSpan, setParentSpan } from "../../../../keyvault-common/src";
+import { withTrace } from "../../tracing";
 import { KeyVaultClientFullRestoreOperationResponse } from "../../generated/models";
 import {
   KeyVaultAdminPollOperation,
@@ -62,15 +62,12 @@ export class RestorePollOperation extends KeyVaultAdminPollOperation<
   /**
    * Tracing the fullRestore operation
    */
-  private async fullRestore(
+  private fullRestore(
     options: KeyVaultClientFullRestoreOperationOptionalParams
   ): Promise<KeyVaultClientFullRestoreOperationResponse> {
-    const span = createSpan("generatedClient.fullRestore", options);
-    try {
-      return await this.client.fullRestoreOperation(this.vaultUrl, setParentSpan(span, options));
-    } finally {
-      span.end();
-    }
+    return withTrace("generatedClient.fullRestore", options, (updatedOptions) =>
+      this.client.fullRestoreOperation(this.vaultUrl, updatedOptions)
+    );
   }
 
   /**
@@ -80,12 +77,9 @@ export class RestorePollOperation extends KeyVaultAdminPollOperation<
     jobId: string,
     options: OperationOptions
   ): Promise<KeyVaultClientRestoreStatusResponse> {
-    const span = createSpan("generatedClient.restoreStatus", options);
-    try {
-      return await this.client.restoreStatus(this.vaultUrl, jobId, setParentSpan(span, options));
-    } finally {
-      span.end();
-    }
+    return withTrace("generatedClient.restoreStatus", options, (updatedOptions) =>
+      this.client.restoreStatus(this.vaultUrl, jobId, updatedOptions)
+    );
   }
 
   /**
@@ -147,8 +141,8 @@ export class RestorePollOperation extends KeyVaultAdminPollOperation<
 
     state.isCompleted = !!endTime;
 
-    if (error?.message) {
-      throw new Error(error?.message);
+    if (status?.toLowerCase() === "failed") {
+      throw new Error(error?.message || statusDetails);
     }
 
     if (state.isCompleted) {
